@@ -1,0 +1,14 @@
+/target
+/result
+/result-*
+.direnv/
+.git/
+.github/
+*.log
+deploy/
+runs/
+README.md
+.gitignore
+.dockerignore
+flake.nix
+flake.lock
