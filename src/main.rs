@@ -31,6 +31,7 @@
 
 mod dedup_rank;
 mod fetcher;
+mod neutrality;
 
 use axum::{routing::get, Json, Router};
 use futures::future::join_all;

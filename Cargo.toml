@@ -1,6 +1,6 @@
 [package]
 name = "sacredvote-civic-news"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["thepictishbeast <admin@plausiden.com>"]
 description = "Civic news aggregator sidecar for Sacred.Vote (#154)"
