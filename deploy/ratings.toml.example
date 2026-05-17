@@ -1,0 +1,50 @@
+# sacredvote-civic-news source-rating registry — example.
+#
+# Copy to /etc/sacredvote-civic-news/ratings.toml and edit for your
+# curated source list. The sidecar loads this file at startup (via
+# CIVIC_NEWS_RATINGS_TOML env var) and annotates matching feed items
+# with bias / factual / neutrality_score fields on the /feeds wire
+# format.
+#
+# Sources NOT in this file pass through unannotated (the wire payload
+# omits the bias/factual/neutrality_score fields — kept minimal).
+#
+# bias ∈ left-extreme | left | center-left | center | center-right | right | right-extreme | mixed | unknown
+# factual ∈ very-high | high | mixed | low | unknown
+#
+# Sacred.Vote's neutrality formula (mirrors iter #538 of the main repo):
+#   raw   = (1 - bias_distance) * 0.6 + factual_weight * 0.4
+#   score = round(raw * 100)   # → [0, 100], NaN for "mixed" or "unknown" bias
+#
+# Examples below are PLACEHOLDERS — real ratings should come from a
+# vetted source (e.g. Media Bias/Fact Check public dataset, AllSides
+# ratings, or a Sacred.Vote-curated panel). Do not ship these example
+# entries to production.
+
+[[source]]
+url = "https://example-center.example/rss"
+bias = "center"
+factual = "high"
+
+[[source]]
+url = "https://example-center-left.example/atom"
+bias = "center-left"
+factual = "very-high"
+
+[[source]]
+url = "https://example-center-right.example/feed"
+bias = "center-right"
+factual = "very-high"
+
+[[source]]
+url = "https://example-mixed.example/rss"
+bias = "mixed"
+factual = "mixed"
+
+# When the ratings dataset hasn't assessed a source, list it with bias =
+# "unknown" + factual = "unknown" (or just omit it from this file — the
+# sidecar treats absent sources the same way).
+[[source]]
+url = "https://example-unrated.example/atom"
+bias = "unknown"
+factual = "unknown"
