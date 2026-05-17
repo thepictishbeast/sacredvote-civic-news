@@ -1,0 +1,48 @@
+# Caddyfile snippet — Sacred.Vote main server reverse-proxy to the
+# sacredvote-civic-news sidecar.
+#
+# Include this snippet from your Sacred.Vote Caddyfile via `import`:
+#
+#   sacred.vote {
+#       ...
+#       import sacredvote-civic-news.caddy
+#       ...
+#   }
+#
+# The sidecar binds 127.0.0.1:3005 and serves only GET endpoints. The
+# main server gates the entire /api/civic-news/* prefix behind the
+# NEWS_AGGREGATOR_ENABLED paywall flag at the Express layer before the
+# request reaches Caddy (so this snippet does NOT gate; the flag check
+# lives in the application).
+
+@civic_news path /api/civic-news/*
+
+handle @civic_news {
+    # Strip the /api/civic-news prefix so the sidecar sees /health,
+    # /feeds, etc. directly.
+    uri strip_prefix /api/civic-news
+
+    reverse_proxy 127.0.0.1:3005 {
+        # Forward the original client IP for the sidecar's logs.
+        header_up X-Real-IP {client_ip}
+        header_up X-Forwarded-For {client_ip}
+        header_up X-Forwarded-Proto {scheme}
+
+        # The sidecar has its own 10s timeout. Be more generous at the
+        # Caddy layer to allow the sidecar to drain a slow feed.
+        transport http {
+            response_header_timeout 15s
+            dial_timeout 5s
+        }
+
+        # On sidecar failure, return 503 rather than crashing the upstream
+        # request. The frontend should treat /api/civic-news 503 as
+        # "feature temporarily unavailable, try again later."
+        @5xx status 5xx
+        handle_response @5xx {
+            respond 503 {
+                close
+            }
+        }
+    }
+}

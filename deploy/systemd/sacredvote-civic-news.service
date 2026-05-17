@@ -1,0 +1,72 @@
+# sacredvote-civic-news — Sacred.Vote civic news aggregator sidecar.
+#
+# Drop into /etc/systemd/system/, then:
+#   systemctl daemon-reload
+#   systemctl enable --now sacredvote-civic-news
+#
+# Service runs as a dedicated unprivileged user `civicnews`. The binary
+# lives at /opt/sacredvote-civic-news/bin/sacredvote-civic-news; the
+# source-rating TOML at /etc/sacredvote-civic-news/ratings.toml (optional).
+# All process resources sandboxed via systemd hardening flags below.
+
+[Unit]
+Description=Sacred.Vote civic news aggregator sidecar (#154)
+Documentation=https://github.com/thepictishbeast/sacredvote-civic-news
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=civicnews
+Group=civicnews
+ExecStart=/opt/sacredvote-civic-news/bin/sacredvote-civic-news
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=10s
+
+# Environment
+Environment="CIVIC_NEWS_BIND=127.0.0.1:3005"
+Environment="RUST_LOG=info"
+EnvironmentFile=-/etc/sacredvote-civic-news/env
+
+# Systemd hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHostname=true
+ProtectProc=invisible
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@mount @debug @cpu-emulation @obsolete @swap @raw-io @reboot @resources
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# Network — sidecar binds 127.0.0.1; only needs outbound HTTPS for feed fetching
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+IPAddressDeny=any
+IPAddressAllow=localhost
+IPAddressAllow=any
+
+# Resource limits — defensive caps; civic news is not a heavy workload
+MemoryMax=512M
+TasksMax=64
+CPUQuota=50%
+LimitNOFILE=4096
+
+# Read-only filesystem except logs + state dir
+ReadWritePaths=/var/log/sacredvote-civic-news
+
+[Install]
+WantedBy=multi-user.target
