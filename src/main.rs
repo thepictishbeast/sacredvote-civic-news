@@ -32,6 +32,7 @@
 mod dedup_rank;
 mod fetcher;
 mod neutrality;
+mod registry;
 
 use axum::{routing::get, Json, Router};
 use futures::future::join_all;
@@ -68,6 +69,7 @@ pub struct AppState {
     pub started_at: Instant,
     pub http_client: reqwest::Client,
     pub feeds_cache: Arc<Mutex<Option<CacheEntry>>>,
+    pub source_registry: Arc<registry::Registry>,
 }
 
 impl AppState {
@@ -77,6 +79,7 @@ impl AppState {
             http_client: fetcher::build_client()
                 .expect("build_client should succeed at startup"),
             feeds_cache: Arc::new(Mutex::new(None)),
+            source_registry: Arc::new(registry::Registry::load_from_env_or_empty()),
         }
     }
     pub fn uptime_seconds(&self) -> u64 {
@@ -125,6 +128,39 @@ pub struct NewsItem {
     pub title: String,
     pub url: String,
     pub published_iso: Option<String>,
+    /// Bias annotation from the source registry. Omitted from wire when None.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bias: Option<neutrality::BiasRating>,
+    /// Factual-tier annotation from the source registry.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub factual: Option<neutrality::FactualTier>,
+    /// Composite neutrality score [0, 100], None when bias or factual missing.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub neutrality_score: Option<f64>,
+    /// Human-readable bias label (ASCII).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bias_label: Option<&'static str>,
+}
+
+impl NewsItem {
+    /// Annotate this item with bias/factual from a registry. If the
+    /// source is in the registry as (Unknown, Unknown), no annotation
+    /// is added (keeps wire payload minimal).
+    pub fn with_registry_annotation(mut self, reg: &registry::Registry) -> Self {
+        let (bias, factual) = reg.lookup(&self.source);
+        let is_known = !matches!(
+            (bias, factual),
+            (neutrality::BiasRating::Unknown, neutrality::FactualTier::Unknown)
+        );
+        if is_known {
+            let score = neutrality::compute_neutrality_score(bias, factual);
+            self.bias = Some(bias);
+            self.factual = Some(factual);
+            self.neutrality_score = if score.is_nan() { None } else { Some(score) };
+            self.bias_label = Some(neutrality::format_bias_label(bias));
+        }
+        self
+    }
 }
 
 pub fn unix_timestamp() -> u64 {
@@ -213,6 +249,13 @@ pub async fn aggregate_feeds(state: &AppState) -> Vec<NewsItem> {
     let merged: Vec<NewsItem> = results.into_iter().flatten().collect();
     let mut ranked = dedup_rank::dedup_and_rank(merged);
     ranked.truncate(MAX_AGGREGATED_ITEMS);
+    // Annotate with bias/factual from the registry. Items whose source
+    // is not in the registry pass through unannotated.
+    let registry = state.source_registry.clone();
+    ranked = ranked
+        .into_iter()
+        .map(|item| item.with_registry_annotation(&registry))
+        .collect();
     let mut cache = state.feeds_cache.lock().await;
     *cache = Some(CacheEntry {
         items: ranked.clone(),

@@ -95,6 +95,10 @@ mod tests {
             title: title.to_string(),
             url: url.to_string(),
             published_iso: published.map(|s| s.to_string()),
+            bias: None,
+            factual: None,
+            neutrality_score: None,
+            bias_label: None,
         }
     }
 

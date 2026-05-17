@@ -1,6 +1,6 @@
 [package]
 name = "sacredvote-civic-news"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 authors = ["thepictishbeast <admin@plausiden.com>"]
 description = "Civic news aggregator sidecar for Sacred.Vote (#154)"
@@ -36,6 +36,7 @@ feed-rs = "2"
 futures = "0.3"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 bytes = "1"
+toml = "0.8"
 
 [dev-dependencies]
 tokio-test = "0.4"
