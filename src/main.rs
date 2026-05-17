@@ -140,6 +140,9 @@ pub struct NewsItem {
     /// Human-readable bias label (ASCII).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bias_label: Option<&'static str>,
+    /// Human-readable factual-reporting tier label (ASCII).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub factual_label: Option<&'static str>,
 }
 
 impl NewsItem {
@@ -158,6 +161,7 @@ impl NewsItem {
             self.factual = Some(factual);
             self.neutrality_score = if score.is_nan() { None } else { Some(score) };
             self.bias_label = Some(neutrality::format_bias_label(bias));
+            self.factual_label = Some(neutrality::format_factual_label(factual));
         }
         self
     }
@@ -455,5 +459,54 @@ mod tests {
         let body_bytes = axum::body::to_bytes(response.into_body(), 1024).await.unwrap();
         let body_str = std::str::from_utf8(&body_bytes).unwrap();
         assert!(body_str.contains(SERVICE_NAME));
+    }
+
+    #[test]
+    fn with_registry_annotation_populates_both_labels() {
+        let toml = r#"
+            [[source]]
+            url = "https://known.example/rss"
+            bias = "center"
+            factual = "very-high"
+        "#;
+        let reg = registry::Registry::load_from_str(toml).expect("toml parses");
+
+        let item = NewsItem {
+            source: "https://known.example/rss".to_string(),
+            title: "test".to_string(),
+            url: "https://known.example/article-1".to_string(),
+            published_iso: None,
+            bias: None,
+            factual: None,
+            neutrality_score: None,
+            bias_label: None,
+            factual_label: None,
+        };
+        let annotated = item.with_registry_annotation(&reg);
+        // Known source: both labels MUST populate.
+        assert_eq!(annotated.bias_label, Some("Center"));
+        assert_eq!(annotated.factual_label, Some("Very High"));
+        assert!(annotated.neutrality_score.is_some());
+    }
+
+    #[test]
+    fn with_registry_annotation_omits_labels_for_unknown_source() {
+        let reg = registry::Registry::empty();
+        let item = NewsItem {
+            source: "https://unknown.example/rss".to_string(),
+            title: "test".to_string(),
+            url: "https://unknown.example/article-1".to_string(),
+            published_iso: None,
+            bias: None,
+            factual: None,
+            neutrality_score: None,
+            bias_label: None,
+            factual_label: None,
+        };
+        let annotated = item.with_registry_annotation(&reg);
+        // Unknown source: both labels omitted (None) to keep wire minimal.
+        assert!(annotated.bias_label.is_none());
+        assert!(annotated.factual_label.is_none());
+        assert!(annotated.neutrality_score.is_none());
     }
 }

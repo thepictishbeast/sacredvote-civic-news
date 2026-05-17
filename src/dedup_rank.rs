@@ -99,6 +99,7 @@ mod tests {
             factual: None,
             neutrality_score: None,
             bias_label: None,
+            factual_label: None,
         }
     }
 

@@ -112,6 +112,7 @@ pub fn parse_bytes(bytes: &[u8], source_url: &str) -> Result<Vec<NewsItem>> {
             factual: None,
             neutrality_score: None,
             bias_label: None,
+            factual_label: None,
         });
     }
     Ok(out)
