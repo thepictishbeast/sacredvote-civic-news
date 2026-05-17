@@ -22,11 +22,75 @@ local-loopback bind only.
 
 ## Build + run
 
+### With cargo (any Rust 1.83+ toolchain)
+
 ```bash
 cargo build --release
 CIVIC_NEWS_SOURCES="https://example.com/rss,https://another.example/atom" \
   ./target/release/sacredvote-civic-news
 ```
+
+### With Nix flake (reproducible)
+
+`flake.nix` pins the Rust toolchain (1.83.0) and builds via [crane](https://github.com/ipetkov/crane) for incremental dep-cache reuse:
+
+```bash
+# Build
+nix build
+
+# Run directly without installing
+nix run -- --help
+
+# Open a dev shell with rust-analyzer + cargo-watch
+nix develop
+
+# CI-style: build + clippy --deny-warnings + tests + rustfmt
+nix flake check
+```
+
+### NixOS deployment (via the flake's nixosModules.default)
+
+Drop the sidecar into a NixOS configuration:
+
+```nix
+{
+  inputs.sacredvote-civic-news.url = "github:thepictishbeast/sacredvote-civic-news";
+
+  outputs = { self, nixpkgs, sacredvote-civic-news, ... }: {
+    nixosConfigurations.my-vps = nixpkgs.lib.nixosSystem {
+      modules = [
+        sacredvote-civic-news.nixosModules.default
+        ({ ... }: {
+          services.sacredvote-civic-news = {
+            enable = true;
+            bind = "127.0.0.1:3005";
+            sources = [
+              "https://example.com/rss"
+              "https://another.example/atom"
+            ];
+            ratingsToml = ./ratings.toml; # optional
+            logLevel = "info";
+          };
+        })
+      ];
+    };
+  };
+}
+```
+
+The module enables a hardened systemd service (NoNewPrivileges,
+ProtectSystem=strict, MemoryDenyWriteExecute, SystemCallFilter=
+@system-service minus dangerous syscalls, 512M / 50% CPU / 64 tasks
+caps, dedicated `civicnews` system user).
+
+### Non-NixOS systemd install (using cargo)
+
+```bash
+sudo ./deploy/install.sh
+```
+
+Builds via `cargo build --release`, creates a `civicnews` user, drops
+the systemd unit into `/etc/systemd/system/`, enables + starts. Idempotent.
 
 ## Endpoints (all GET, JSON responses)
 
@@ -35,7 +99,7 @@ CIVIC_NEWS_SOURCES="https://example.com/rss,https://another.example/atom" \
 | `/health` | 200 OK with service name + version + uptime |
 | `/version` | Service identity (semver + git SHA when built with `GIT_SHA=...`) |
 | `/sources` | Configured RSS source URLs (HTTPS-only) |
-| `/feeds` | Aggregated news items (placeholder in v0.1; aggregation in next iter) |
+| `/feeds` | Aggregated news items (deduped + recency-ranked; optionally bias-annotated per `CIVIC_NEWS_RATINGS_TOML`) |
 
 ## Environment
 
@@ -44,7 +108,39 @@ CIVIC_NEWS_SOURCES="https://example.com/rss,https://another.example/atom" \
 | `CIVIC_NEWS_BIND` | `127.0.0.1:3005` | Listen address. **Do not bind to 0.0.0.0** — sidecar should never be public. |
 | `CIVIC_NEWS_SOURCES` | (empty) | Comma-separated HTTPS RSS/Atom URLs. Non-HTTPS entries silently dropped. |
 | `RUST_LOG` | `info` | Tracing verbosity. |
+| `CIVIC_NEWS_RATINGS_TOML` | (unset) | Path to source-rating TOML registry (see `src/registry.rs` doc comment for format). When set, items are annotated with bias / factual / neutrality_score fields on the wire. Unrated sources pass through unannotated. |
 | `GIT_SHA` | (unset) | Build-time only; surfaces in `/version` for ops correlation. |
+
+## Source-rating TOML format
+
+When `CIVIC_NEWS_RATINGS_TOML` points at a file, the sidecar loads it at
+startup and uses it to annotate matching feed items with bias + factual
+tier + a composite neutrality score (0–100). Format:
+
+```toml
+[[source]]
+url = "https://example.com/rss"
+bias = "center"        # left-extreme | left | center-left | center | center-right | right | right-extreme | mixed | unknown
+factual = "high"       # very-high | high | mixed | low | unknown
+
+[[source]]
+url = "https://another.example/atom"
+bias = "center-right"
+factual = "very-high"
+```
+
+The scoring formula mirrors Sacred.Vote's
+`shared/news-neutrality-helpers.ts` (iter #538) so an auditor can compare
+the TS and Rust outputs byte-identical:
+
+```
+raw   = (1 - bias_distance) * 0.6 + factual_weight * 0.4
+score = round(raw * 100)
+```
+
+Where `bias_distance ∈ [0, 1]` and `factual_weight ∈ [0, 1]`. "Mixed" or
+"unknown" bias yields a NaN score (the wire field is then omitted via
+`#[serde(skip_serializing_if = "Option::is_none")]`).
 
 ## Design pins
 
