@@ -1,0 +1,43 @@
+[package]
+name = "sacredvote-civic-news"
+version = "0.1.0"
+edition = "2021"
+authors = ["thepictishbeast <admin@plausiden.com>"]
+description = "Civic news aggregator sidecar for Sacred.Vote (#154)"
+license = "MIT"
+
+# Sidecar service: fetches RSS/Atom feeds from a curated source list,
+# deduplicates by URL+title, ranks by recency, and serves the result via
+# JSON HTTP API on port 3005. The Sacred.Vote main server proxies to
+# this sidecar behind the NEWS_AGGREGATOR_ENABLED paywall flag.
+#
+# Why a sidecar (vs in-process Node code):
+#   1. Cold-start time + memory cost of running a fully-async feed
+#      fetcher inside the main Express service is unattractive.
+#   2. Rust's feed-rs parser is well-vetted and handles malformed RSS
+#      better than the JS alternatives.
+#   3. Standalone bin matches feedback_standalone_architecture +
+#      feedback_rust_default conventions.
+
+[dependencies]
+axum = { version = "0.7", features = ["macros"] }
+tokio = { version = "1", features = ["full"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["trace", "timeout", "limit", "cors"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "gzip", "brotli"] }
+url = "2"
+anyhow = "1"
+thiserror = "2"
+
+[dev-dependencies]
+tokio-test = "0.4"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
