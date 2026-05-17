@@ -91,6 +91,30 @@ sudo ./deploy/install.sh
 
 Builds via `cargo build --release`, creates a `civicnews` user, drops
 the systemd unit into `/etc/systemd/system/`, enables + starts. Idempotent.
+Pair with `sudo ./deploy/uninstall.sh` (also idempotent, preserves
+config + logs by default; `PURGE_CONFIG=1 PURGE_LOGS=1 REMOVE_USER=1`
+to fully wipe).
+
+### Docker
+
+```bash
+docker build -t sacredvote-civic-news:0.7.0 .
+
+# Loopback-only — DO NOT expose 3005 publicly
+docker run --rm -p 127.0.0.1:3005:3005 \
+  -e CIVIC_NEWS_SOURCES="https://example.com/rss" \
+  sacredvote-civic-news:0.7.0
+
+# With a bind-mounted ratings TOML
+docker run --rm -p 127.0.0.1:3005:3005 \
+  -e CIVIC_NEWS_SOURCES="https://a.example/rss" \
+  -e CIVIC_NEWS_RATINGS_TOML=/etc/ratings.toml \
+  -v $(pwd)/deploy/ratings.toml.example:/etc/ratings.toml:ro \
+  sacredvote-civic-news:0.7.0
+```
+
+Two-stage Alpine-based build. Final image ~2 MB. Non-root user.
+Built-in HEALTHCHECK on `/health` every 30s.
 
 ## Endpoints (all GET, JSON responses)
 
