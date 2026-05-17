@@ -29,11 +29,16 @@
 //! NEWS_AGGREGATOR_ENABLED before proxying). The sidecar itself does
 //! NOT check the paywall — it's a private internal service.
 
+mod dedup_rank;
+mod fetcher;
+
 use axum::{routing::get, Json, Router};
+use futures::future::join_all;
 use serde::Serialize;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::timeout::TimeoutLayer;
@@ -44,15 +49,34 @@ pub const SERVICE_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const DEFAULT_BIND: &str = "127.0.0.1:3005";
 pub const REQUEST_TIMEOUT_SECS: u64 = 10;
 pub const REQUEST_BODY_LIMIT_BYTES: usize = 4096;
+/// In-memory cache TTL for /feeds. Refetches the upstream sources only
+/// every CACHE_TTL_SECS — defends against accidental DOS against the
+/// upstream feed hosts (and against Sacred.Vote main-server retries
+/// stampeding us).
+pub const CACHE_TTL_SECS: u64 = 600; // 10 minutes
+pub const MAX_AGGREGATED_ITEMS: usize = 200;
+
+#[derive(Clone)]
+pub struct CacheEntry {
+    pub items: Vec<NewsItem>,
+    pub fetched_at: Instant,
+}
 
 #[derive(Clone)]
 pub struct AppState {
     pub started_at: Instant,
+    pub http_client: reqwest::Client,
+    pub feeds_cache: Arc<Mutex<Option<CacheEntry>>>,
 }
 
 impl AppState {
     pub fn new() -> Self {
-        AppState { started_at: Instant::now() }
+        AppState {
+            started_at: Instant::now(),
+            http_client: fetcher::build_client()
+                .expect("build_client should succeed at startup"),
+            feeds_cache: Arc::new(Mutex::new(None)),
+        }
     }
     pub fn uptime_seconds(&self) -> u64 {
         self.started_at.elapsed().as_secs()
@@ -137,13 +161,63 @@ async fn sources() -> Json<SourcesResponse> {
     })
 }
 
-async fn feeds() -> Json<FeedsResponse> {
-    // Placeholder: future iter fetches from sources, deduplicates, ranks.
+async fn feeds(
+    axum::extract::State(state): axum::extract::State<Arc<AppState>>,
+) -> Json<FeedsResponse> {
+    let items = aggregate_feeds(&state).await;
+    let count = items.len();
     Json(FeedsResponse {
-        items: Vec::new(),
-        count: 0,
-        note: "Aggregation deferred to follow-up iter — feed-rs + reqwest fetch loop.",
+        items,
+        count,
+        note: "",
     })
+}
+
+/// Fetch + parse + dedup + rank from all configured sources. Cached
+/// for CACHE_TTL_SECS to defend against stampedes.
+pub async fn aggregate_feeds(state: &AppState) -> Vec<NewsItem> {
+    // Check cache first.
+    {
+        let cache = state.feeds_cache.lock().await;
+        if let Some(entry) = cache.as_ref() {
+            if entry.fetched_at.elapsed().as_secs() < CACHE_TTL_SECS {
+                return entry.items.clone();
+            }
+        }
+    }
+    // Cache miss or expired — refresh.
+    let sources = parse_sources_from_env();
+    if sources.is_empty() {
+        let mut cache = state.feeds_cache.lock().await;
+        *cache = Some(CacheEntry {
+            items: Vec::new(),
+            fetched_at: Instant::now(),
+        });
+        return Vec::new();
+    }
+    let futures = sources.iter().map(|src| {
+        let client = state.http_client.clone();
+        let url = src.clone();
+        async move {
+            match fetcher::fetch_and_parse(&client, &url).await {
+                Ok(items) => items,
+                Err(e) => {
+                    tracing::warn!(source = %url, error = %e, "feed fetch failed");
+                    Vec::new()
+                }
+            }
+        }
+    });
+    let results: Vec<Vec<NewsItem>> = join_all(futures).await;
+    let merged: Vec<NewsItem> = results.into_iter().flatten().collect();
+    let mut ranked = dedup_rank::dedup_and_rank(merged);
+    ranked.truncate(MAX_AGGREGATED_ITEMS);
+    let mut cache = state.feeds_cache.lock().await;
+    *cache = Some(CacheEntry {
+        items: ranked.clone(),
+        fetched_at: Instant::now(),
+    });
+    ranked
 }
 
 pub fn parse_sources_from_env() -> Vec<String> {
