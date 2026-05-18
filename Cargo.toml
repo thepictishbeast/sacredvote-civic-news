@@ -46,3 +46,15 @@ opt-level = 3
 lto = "fat"
 codegen-units = 1
 strip = true
+
+# Lint policy — declarative, manifest-level. Any caller invoking `cargo
+# clippy` (no flags) sees the same gates that the Nix flake's
+# `cargoClippyExtraArgs = "--all-targets -- --deny warnings"` and any
+# CI workflows enforce. Subsumes that flag. `priority = -1` on the
+# broad denies lets future tighter allow-overrides win at the same
+# lint without flag-precedence surprises.
+[lints.rust]
+warnings = { level = "deny", priority = -1 }
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
