@@ -180,7 +180,7 @@ mod tests {
             BiasRating::RightExtreme,
         ] {
             let d = bias_distance(rating);
-            assert!(d >= 0.0 && d <= 1.0, "rating={:?} dist={}", rating, d);
+            assert!((0.0..=1.0).contains(&d), "rating={:?} dist={}", rating, d);
         }
     }
 

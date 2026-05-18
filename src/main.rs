@@ -401,12 +401,16 @@ mod tests {
 
     #[test]
     fn request_body_limit_is_tiny() {
-        assert!(REQUEST_BODY_LIMIT_BYTES <= 4096);
+        // Compile-time const check — stronger than a runtime assert. If
+        // someone bumps REQUEST_BODY_LIMIT_BYTES above 4096, `cargo test`
+        // fails at build time before reaching this test.
+        const { assert!(REQUEST_BODY_LIMIT_BYTES <= 4096) };
     }
 
     #[test]
     fn timeout_is_bounded() {
-        assert!(REQUEST_TIMEOUT_SECS <= 30);
+        // Compile-time const check — see request_body_limit_is_tiny.
+        const { assert!(REQUEST_TIMEOUT_SECS <= 30) };
     }
 
     #[tokio::test]
