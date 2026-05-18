@@ -55,7 +55,9 @@ pub struct Registry {
 
 impl Registry {
     pub fn empty() -> Self {
-        Registry { by_url: HashMap::new() }
+        Registry {
+            by_url: HashMap::new(),
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -150,7 +152,10 @@ factual = "very-high"
     #[test]
     fn empty_registry_returns_unknown() {
         let r = Registry::empty();
-        assert_eq!(r.lookup("https://anything"), (BiasRating::Unknown, FactualTier::Unknown));
+        assert_eq!(
+            r.lookup("https://anything"),
+            (BiasRating::Unknown, FactualTier::Unknown)
+        );
     }
 
     #[test]
@@ -191,14 +196,8 @@ factual = "high"
         let r = Registry::load_from_str(toml).unwrap();
         // The stored URL had a trailing slash, but normalize strips it.
         // So lookup for both forms should match.
-        assert_eq!(
-            r.lookup("https://example.com/rss/").0,
-            BiasRating::Center
-        );
-        assert_eq!(
-            r.lookup("https://example.com/rss").0,
-            BiasRating::Center
-        );
+        assert_eq!(r.lookup("https://example.com/rss/").0, BiasRating::Center);
+        assert_eq!(r.lookup("https://example.com/rss").0, BiasRating::Center);
     }
 
     #[test]

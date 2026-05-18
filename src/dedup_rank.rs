@@ -106,8 +106,18 @@ mod tests {
     #[test]
     fn dedup_collapses_identical_url_title() {
         let items = vec![
-            item("https://feed-a.com/rss", "Headline", "https://news.com/article-1", Some("2026-05-17T10:00:00Z")),
-            item("https://feed-b.com/rss", "Headline", "https://news.com/article-1", Some("2026-05-17T10:00:00Z")),
+            item(
+                "https://feed-a.com/rss",
+                "Headline",
+                "https://news.com/article-1",
+                Some("2026-05-17T10:00:00Z"),
+            ),
+            item(
+                "https://feed-b.com/rss",
+                "Headline",
+                "https://news.com/article-1",
+                Some("2026-05-17T10:00:00Z"),
+            ),
         ];
         let out = dedup(items);
         assert_eq!(out.len(), 1);
@@ -128,7 +138,12 @@ mod tests {
     #[test]
     fn dedup_treats_fragment_as_same() {
         let items = vec![
-            item("https://f.com", "T", "https://news.com/post#section-1", None),
+            item(
+                "https://f.com",
+                "T",
+                "https://news.com/post#section-1",
+                None,
+            ),
             item("https://g.com", "T", "https://news.com/post", None),
         ];
         let out = dedup(items);
@@ -206,9 +221,24 @@ mod tests {
     #[test]
     fn dedup_and_rank_end_to_end() {
         let items = vec![
-            item("https://a.com", "Headline A", "https://news.com/a", Some("2026-05-17T10:00:00Z")),
-            item("https://b.com", "Headline A", "https://news.com/a", Some("2026-05-17T10:00:00Z")), // dup
-            item("https://a.com", "Older Story", "https://news.com/old", Some("2026-01-01T00:00:00Z")),
+            item(
+                "https://a.com",
+                "Headline A",
+                "https://news.com/a",
+                Some("2026-05-17T10:00:00Z"),
+            ),
+            item(
+                "https://b.com",
+                "Headline A",
+                "https://news.com/a",
+                Some("2026-05-17T10:00:00Z"),
+            ), // dup
+            item(
+                "https://a.com",
+                "Older Story",
+                "https://news.com/old",
+                Some("2026-01-01T00:00:00Z"),
+            ),
         ];
         let out = dedup_and_rank(items);
         assert_eq!(out.len(), 2);

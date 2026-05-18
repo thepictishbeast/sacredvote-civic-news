@@ -304,7 +304,10 @@ mod tests {
         // Lock in the exact strings (must match TS).
         assert_eq!(format_bias_label(BiasRating::LeftExtreme), "Left (Strong)");
         assert_eq!(format_bias_label(BiasRating::Center), "Center");
-        assert_eq!(format_bias_label(BiasRating::RightExtreme), "Right (Strong)");
+        assert_eq!(
+            format_bias_label(BiasRating::RightExtreme),
+            "Right (Strong)"
+        );
         assert_eq!(format_bias_label(BiasRating::Mixed), "Mixed");
     }
 

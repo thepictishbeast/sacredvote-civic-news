@@ -76,8 +76,7 @@ impl AppState {
     pub fn new() -> Self {
         AppState {
             started_at: Instant::now(),
-            http_client: fetcher::build_client()
-                .expect("build_client should succeed at startup"),
+            http_client: fetcher::build_client().expect("build_client should succeed at startup"),
             feeds_cache: Arc::new(Mutex::new(None)),
             source_registry: Arc::new(registry::Registry::load_from_env_or_empty()),
         }
@@ -153,7 +152,10 @@ impl NewsItem {
         let (bias, factual) = reg.lookup(&self.source);
         let is_known = !matches!(
             (bias, factual),
-            (neutrality::BiasRating::Unknown, neutrality::FactualTier::Unknown)
+            (
+                neutrality::BiasRating::Unknown,
+                neutrality::FactualTier::Unknown
+            )
         );
         if is_known {
             let score = neutrality::compute_neutrality_score(bias, factual);
@@ -456,7 +458,9 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(response.status(), axum::http::StatusCode::OK);
-        let body_bytes = axum::body::to_bytes(response.into_body(), 1024).await.unwrap();
+        let body_bytes = axum::body::to_bytes(response.into_body(), 1024)
+            .await
+            .unwrap();
         let body_str = std::str::from_utf8(&body_bytes).unwrap();
         assert!(body_str.contains(SERVICE_NAME));
     }

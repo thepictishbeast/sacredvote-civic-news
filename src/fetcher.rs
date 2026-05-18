@@ -61,10 +61,7 @@ async fn read_capped(resp: reqwest::Response, cap: u64) -> Result<bytes::Bytes> 
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.context("read body chunk")?;
         if (buf.len() as u64) + (chunk.len() as u64) > cap {
-            return Err(anyhow!(
-                "read_capped: response exceeds {} bytes",
-                cap
-            ));
+            return Err(anyhow!("read_capped: response exceeds {} bytes", cap));
         }
         buf.extend_from_slice(&chunk);
     }
@@ -75,8 +72,7 @@ async fn read_capped(resp: reqwest::Response, cap: u64) -> Result<bytes::Bytes> 
 /// Returns up to MAX_ITEMS_PER_FEED items. Synthetic / source URL is
 /// stored on each item for downstream attribution.
 pub fn parse_bytes(bytes: &[u8], source_url: &str) -> Result<Vec<NewsItem>> {
-    let parsed =
-        feed_rs::parser::parse(bytes).context("feed_rs::parser::parse")?;
+    let parsed = feed_rs::parser::parse(bytes).context("feed_rs::parser::parse")?;
     let mut out = Vec::with_capacity(parsed.entries.len().min(MAX_ITEMS_PER_FEED));
     for entry in parsed.entries.iter().take(MAX_ITEMS_PER_FEED) {
         let title = entry
@@ -99,10 +95,7 @@ pub fn parse_bytes(bytes: &[u8], source_url: &str) -> Result<Vec<NewsItem>> {
             // skip mailto: + javascript: + relative
             continue;
         }
-        let published_iso = entry
-            .published
-            .or(entry.updated)
-            .map(|t| t.to_rfc3339());
+        let published_iso = entry.published.or(entry.updated).map(|t| t.to_rfc3339());
         out.push(NewsItem {
             source: source_url.to_string(),
             title,
@@ -243,8 +236,10 @@ mod tests {
 
     #[test]
     fn parse_bytes_caps_at_max_items() {
-        let mut rss = String::from(r#"<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0"><channel><title>T</title><link>https://e.com/</link><description>T</description>"#);
+        let mut rss = String::from(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel><title>T</title><link>https://e.com/</link><description>T</description>"#,
+        );
         for i in 0..(MAX_ITEMS_PER_FEED + 50) {
             rss.push_str(&format!(
                 r#"<item><title>Item {i}</title><link>https://e.com/{i}</link></item>"#
