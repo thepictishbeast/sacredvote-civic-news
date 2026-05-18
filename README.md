@@ -180,15 +180,17 @@ Where `bias_distance ∈ [0, 1]` and `factual_weight ∈ [0, 1]`. "Mixed" or
 
 ## Roadmap
 
-- **v0.1 (this iter)** — HTTP skeleton, /health + /version + /sources +
-  /feeds (placeholder), 11+ unit tests, local-loopback binding.
-- **v0.2** — Feed fetcher loop: reqwest + feed-rs, dedup by URL + title,
-  recency ranking, in-memory cache with TTL.
-- **v0.3** — Bias-rating annotation via Sacred.Vote `shared/news-neutrality-helpers.ts`
-  (iter #538). The sidecar would tag each item with the neutrality
-  scaffold's score so the main app doesn't re-compute.
-- **v0.4** — systemd unit + Caddyfile reverse-proxy snippet for the main
-  server to forward `/api/civic-news/*` to the sidecar.
+| Version | Status   | Milestone                                                                                  |
+|---------|----------|--------------------------------------------------------------------------------------------|
+| v0.1    | shipped  | HTTP skeleton: `/health` + `/version` + `/sources` + `/feeds` placeholder, local-loopback. |
+| v0.2    | shipped  | Feed fetcher loop: `reqwest` + `feed-rs`, dedup by URL + title, recency ranking, in-memory cache with TTL. |
+| v0.3    | shipped  | Neutrality module — port of Sacred.Vote `shared/news-neutrality-helpers.ts` (iter #538).   |
+| v0.4    | shipped  | Source-rating registry (`ratings.toml`) + annotated `/feeds` output (each item carries `biasLabel` + `factualLabel`). |
+| v0.5    | shipped  | Deployment artifacts: hardened systemd unit + Caddy reverse-proxy snippet + `install.sh`.  |
+| v0.6    | shipped  | Nix flake — `crane`-based reproducible build + `nixosModules.default` for declarative deploy. |
+| v0.7    | shipped  | Multi-stage Dockerfile + `.dockerignore` for `docker build` / `docker run` paths.          |
+| v0.8    | current  | Both `bias_label` and `factual_label` wired through to the JSON response (eliminates dead-code warning on the factual field). |
+| v0.9+   | planned  | Optional: per-source content sanitization (strip script tags from titles/summaries) + an `If-Modified-Since` HEAD short-circuit so the fetcher loop doesn't re-parse unchanged feeds. Both gated on real usage signal — no shipping for shipping's sake. |
 
 ## License
 
