@@ -7,6 +7,16 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+(No unreleased changes.)
+
+## [0.8.1] — 2026-05-19 (LOOP-V3.1#74-#83, #95, #216)
+
+Hygiene + tooling patch release. No behavior change to the
+sidecar's `/feeds` annotated-JSON contract. Aligns civic-news with
+the sibling Rust crates on the same post-hygiene-trilogy +
+ci.sh-runner baseline (sacredvote-axum-poc v0.12.1, plausiden-
+watchtower v0.2.0, sacredvote-civic-news v0.8.1).
+
 ### Changed
 - Repository hygiene pass (LOOP-V3.1#74, #75): `cargo fmt --check` clean
   across all modules + `cargo clippy --all-targets -- -D warnings` clean
@@ -14,6 +24,28 @@ project adheres to [Semantic Versioning](https://semver.org/).
   `assertions_on_constants` in `main.rs` promoted to `const { assert!(..) }`
   for compile-time enforcement of the request-body / timeout bounds).
 - `cargo audit` baseline (LOOP-V3.1#81): 241 deps / 0 advisories.
+- **CHANGELOG.md file** introduced (LOOP-V3.1#83, `408d227`). Format
+  follows Keep-A-Changelog 1.1.0 + SemVer. Retroactively documents
+  v0.1-v0.8 (Docker deployment, factual_label wiring, etc.) from
+  git history.
+- **Manifest-level `[lints]` policy** (LOOP-V3.1#95, `ae86f08`).
+  Migrated the `-D warnings` gate from invocation-time flag into
+  `[lints.rust]` / `[lints.clippy]` deny-all at manifest level. Plain
+  `cargo clippy` AND `cargo build` (NO `-D warnings` flag) now exit
+  clean against the deny gate — the policy is part of the project
+  contract, not an external script's responsibility. Closes the
+  3-repo trilogy alongside plausiden-watchtower (#93) and
+  sacredvote-axum-poc (#94).
+
+### Tooling
+- **`scripts/ci.sh` local 5-gate runner** (LOOP-V3.1#216, `ffa0937`).
+  Sibling artifact to sacredvote-axum-poc/scripts/ci.sh (#207) and
+  plausiden-watchtower/scripts/ci.sh. Same 5-gate shape (fmt +
+  build + clippy + test + audit) across all 3 in-scope Rust crates
+  so operator habit `bash scripts/ci.sh && git push` works uniformly.
+  civic-news has no special feature flags so this is the minimal
+  ci.sh shape. Verified at ship time: 72 unit tests pass, 241 deps
+  audited, 0 vulnerabilities.
 
 ## [0.8.0] — 2026-05-17
 
